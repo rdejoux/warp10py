@@ -1,15 +1,18 @@
-###############################################################################
-#
-#
-###############################################################################
+# -*- coding: utf-8 -*-
+"""
+:Authors:
+  - Romain de Joux
+
+:Copyright:
+  - Romain de Joux 2017
+
+:License:
+  - Apache License Version 2.0
+"""
 
 from __future__ import absolute_import
 
-import os
-import sys
-import platform
 from setuptools import setup
-from setuptools.command.test import test as test_command
 
 # read version string
 with open('warp10/__init__.py') as f:
@@ -20,10 +23,14 @@ with open('README.md') as f:
     docstr = f.read()
 
 
+description = ("Warp10.io [http://www.warp10.io] client library (update, exec, fetch, ...) "
+               "and with GTS and WarpScript helpers")
+
+
 setup(
     name='warp10py',
     version=__version__,
-    description='Warp10.io [http://www.warp10.io] client library (update, exec, fetch, ...) and with GTS and WarpScript helpers',
+    description=description,
     long_description=docstr,
     license='Apache 2 license',
     author='Romain de Joux',
@@ -33,7 +40,7 @@ setup(
         'requests'
     ],
     extras_require={
-#        'websocket': ['authobahn'],
+        # 'websocket': ['authobahn'],
     },
     packages=[
         'warp10',
@@ -55,7 +62,5 @@ setup(
                  "Programming Language :: Python :: Implementation :: CPython",
                  "Programming Language :: Python :: Implementation :: PyPy",
                  "Topic :: Database :: Front-Ends",
-                 "Topic :: Software Development :: Libraries :: Python Modules"
-    ],
-    keywords='warp10 timeseries database client'
-)
+                 "Topic :: Software Development :: Libraries :: Python Modules"],
+    keywords='warp10 timeseries database client')

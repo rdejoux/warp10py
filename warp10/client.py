@@ -10,15 +10,19 @@
   - Apache License Version 2.0
 """
 
+from __future__ import (unicode_literals, absolute_import,
+                        division, print_function)
+
+
 import time
 import datetime
 from io import StringIO
-from itertools import chain
+from collections import OrderedDict
 
 import requests
 
 from .config import default as default_config
-from .gtshelper import Warp10GTSCache, get_ident
+from .gtshelper import get_gts_line, get_meta_line
 
 
 class Warp10UpdateError(Exception):
@@ -45,6 +49,7 @@ class Warp10Client:
                           data=post_buff.getvalue(),
                           headers={'X-Warp10-Token': self.config.write_token})
         if r.status_code != 200:
+            print(r.status_code, r.text)
             raise Warp10UpdateError(r.status_code, r.text)
 
     def warpscript_exec(self, warpscript):
@@ -57,7 +62,9 @@ class Warp10Client:
 
         r = requests.post(self.config.meta_url,
                           data=post_buff.getvalue(),
-                          headers={'X-Warp10-Token': self.config.write_token})
+                          headers={'X-Warp10-Token': self.config.write_token,
+                                   # Needed to auth with OVH Metrics
+                                   'X-CITYZENDATA-TOKEN': self.config.write_token})
         if r.status_code != 200:
             raise Warp10UpdateError(r.status_code, r.text)
 
@@ -75,39 +82,34 @@ class Warp10Client:
 
 
 class Warp10BufferedUpdate(object):
-    def __init__(self, client, buffer_size=(128 * 1024)):
+    def __init__(self, client, buffer_size=(64 * 1024)):
         self.client = client
         self.buffer_size = buffer_size
-        self.gts = {}
+        self.gts = []
+        self.attribs = OrderedDict()
 
     def __len__(self):
-        return sum(len(gts) for gts in self.gts.values())
+        return len(self.gts)
 
     def add_value(self, clsname, labels, value, ts, lat=None, lon=None, elev=None):
-        ident = get_ident(clsname, labels)
-        gts = self.gts.setdefault(ident, Warp10GTSCache(ident=ident))
-        gts.add_value(value, ts, lat=lat, lon=lon, elev=elev)
+        self.gts.append(get_gts_line(value, ts,
+                                     lat=None, lon=None, elev=None,
+                                     clsname=clsname, labels=labels))
         if len(self) > self.buffer_size:
             self.flush()
 
-
     def update_attributes(self, clsname, labels, attributes):
-        ident = get_ident(clsname, labels)
-        if ident not in self.gts:
-            return
-
-        self.gts[ident].update_attributes(attributes)
+        self.attribs[get_meta_line(attributes,
+                                   clsname=clsname, labels=labels)] = None
 
     def flush(self):
         t0 = time.time()
-        self.client.update(chain(*[gts.iter_gts_lines() for gts in self.gts.values()]))
-        self.client.meta([gts.meta_line() for gts in self.gts.values() if gts.attributes])
+        self.client.update(self.gts)
+        self.client.meta(self.attribs.keys())
         self.clean()
         print('[{0:%H:%M:%S}] Flush data. | Duration: {1:0.1f}'.format(datetime.datetime.now(),
                                                                        time.time() - t0))
 
-    def clean(self, remove_gts=False):
-        for gts in self.gts.values():
-            gts.clean()
-        if remove_gts:
-            self.gts = {}
+    def clean(self):
+        self.gts = []
+        self.attribs = OrderedDict()

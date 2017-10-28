@@ -1,6 +1,12 @@
 # -*- coding: utf-8 -*-
 
-from urllib.parse import quote
+from __future__ import (unicode_literals, absolute_import,
+                        division, print_function)
+
+try:
+    from urllib.parse import quote
+except ImportError:
+    from urllib2 import quote
 
 
 def get_tlle(ts=None, lat=None, lon=None, elev=None):
@@ -12,8 +18,10 @@ def get_tlle(ts=None, lat=None, lon=None, elev=None):
 
 
 def get_labels(labels):
-    return '{{{0}}}'.format(','.join(['{0}={1}'.format(k, quote(str(v)))
-                                      for k, v in labels.items()]))
+    keys = list(labels)  # get keys
+    keys.sort()
+    return '{{{0}}}'.format(','.join(['{0}={1}'.format(k, quote(str(labels[k])))
+                                      for k in keys]))
 
 
 def get_ident(clsname, labels):
@@ -39,52 +47,15 @@ def get_gts_line(value, ts=None, lat=None, lon=None, elev=None,
                              value=value)
 
 
-class Warp10GTSCache(object):
-    def __init__(self, ident=None, clsname=None, labels=None, attributes=None):
-        if clsname and labels:
-            ident = get_ident(clsname, labels)
-        if not attributes:
-            attributes = {}
-        self.ident = ident
-        self.attributes = attributes
+def get_meta_line(attributes,
+                  ident=None,
+                  clsname=None, labels=None):
+    if not attributes:
+        return ''
 
-        self.values = []
+    if clsname and labels:
+        ident = get_ident(clsname, labels)
 
-    def __len__(self):
-        return len(self.values)
+    return '{0}{1}\n'.format(ident, get_labels(attributes))
 
-    def clean(self):
-        self.values = []
-        self.attributes = {}
-
-    def add_value(self, value, ts, lat=None, lon=None, elev=None):
-        if self.values and self.values[-1][1][0] == ts:
-            return  # doublon
-        if isinstance(value, str):
-            value = "'{0}'".format(quote(value))
-        self.values.append((value, (ts, lat, lon, elev)))
-
-    def update_attributes(self, attributes):
-        self.attributes.update(attributes)
-
-    def meta_line(self):
-        if not self.attributes:
-            return ''
-
-        return '{0}{1}\n'.format(self.ident, get_labels(self.attributes))
-
-    def iter_gts_lines(self, uniq_class_def=True):
-        if not self.values:
-            raise StopIteration
-
-        ident = self.ident
-        for value, (ts, lat, lon, elev) in self.values:
-            yield get_gts_line(value,
-                               ts=ts, lat=lat, lon=lon, elev=elev,
-                               ident=ident)
-
-            if uniq_class_def:
-                ident = None
-
-        raise StopIteration
 
